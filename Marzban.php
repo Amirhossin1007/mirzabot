@@ -278,7 +278,9 @@ function adduser($location, $data_limit, $username_ac, $timestamp, $note = '', $
             "note" => $note,
             "data_limit_reset_strategy" => $data_limit_reset
         );
-        if (isset($inbounds)) {
+        if ($marzban_list_get['type'] == "rebecca" && !empty($marzban_list_get['inboundid'])) {
+            $data['service_id'] = (int) $marzban_list_get['inboundid'];
+        } elseif (isset($inbounds)) {
             $data['inbounds'] = $inbounds;
         }
         if ($name_product == "usertest") {
