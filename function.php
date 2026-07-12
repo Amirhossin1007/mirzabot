@@ -1328,7 +1328,12 @@ function addFieldToTable($tableName, $fieldName, $defaultValue = null, $datatype
 function outtypepanel($typepanel, $message)
 {
     global $from_id, $optionMarzban, $optionX_ui_single, $optionhiddfy, $option_mirza, $optionalireza_single, $optionmarzneshin, $option_mikrotik, $optionwg, $options_ui, $optionibsng;
-    if ($typepanel == "marzban") {
+    if ($typepanel == "rebecca") {
+        $search = trim(json_encode($GLOBALS['textbotlang']['keyboard']['setProtocolInbound'] ?? '⚙️ تنظیم پروتکل و اینباند', JSON_UNESCAPED_UNICODE), '"');
+        $replace = trim(json_encode('⚙️ تنظیم سرویس پیش‌فرض', JSON_UNESCAPED_UNICODE), '"');
+        $optionRebecca = str_replace([$search, '⚙️ تنظیم پروتکل و اینباند'], [$replace, '⚙️ تنظیم سرویس پیش‌فرض'], $optionMarzban);
+        sendmessage($from_id, $message, $optionRebecca, 'HTML');
+    } elseif ($typepanel == "marzban") {
         sendmessage($from_id, $message, $optionMarzban, 'HTML');
     } elseif ($typepanel == "x-ui_single") {
         sendmessage($from_id, $message, $optionX_ui_single, 'HTML');
