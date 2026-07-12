@@ -998,18 +998,15 @@ Use the buttons below to change the agent type.',
                         'ask_send_account_volume' => '📌 Send the account\'s data volume. The volume is in gigabytes.',
                         'ask_send_service_time_day' => '📌 Send the service duration; the time is in days.',
                         'btn_17' => 'Custom plan',
-                        'msg_help_bot_group_message' => '💬 | Bot report
+                        'msg_help_bot_group_message' => '💬 | Bot Report
 
-🔹 | If you encounter a <b>bug or problem</b> in the bot\'s operation, please report it to us for review.
-➖➖➖➖➖➖➖➖➖➖➖
-🔹 | If you encounter a <b>serious bug</b> or abnormal behavior, report it faster so it can be fixed.
-➖➖➖➖➖➖➖➖➖➖➖
-🔹 | If you have a suggestion for <b>adding a new feature</b> or an idea to improve the bot\'s performance, we\'d be happy to hear it.
-➖➖➖➖➖➖➖➖➖➖➖
-🔹 | Also, if you need <b>guidance</b> or help, you can contact the support team via direct message.
+🔹 | If you encounter a bug or issue with the bot, please let us know so we can look into it.
+🔹 | In case of a serious bug or unusual behavior, report it quickly so it can be fixed.
+🔹 | If you have suggestions for new features or ideas to improve the bot, we'd love to hear them.
+🔹 | Also, if you need guidance or help, you can contact us directly.
 
-📩 | To send a report, suggestion, or request for guidance, leave a message in the <b>Mirza group</b>:
-<a href="https://t.me/mirzapanelgroup" rel="nofollow" target="_blank">Mirza Group</a>',
+📩 | To send a report, suggestion, or request help:
+@einmo',
                         'ask_select_panel' => '🪚 To use this feature, select one of the panels below',
                         'err_admin' => '❌ This section is only available to the main admin',
                         'err_notfound_set_settings' => '❌ Node settings cannot be viewed',
