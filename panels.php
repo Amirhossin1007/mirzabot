@@ -59,7 +59,7 @@ class ManagePanel
         $expire = $Data_Config['expire'];
         $data_limit = $Data_Config['data_limit'];
         $note = "{$Data_Config['from_id']} | {$Data_Config['username']} | {$Data_Config['type']}";
-        if ($Get_Data_Panel['type'] == "marzban") {
+        if ($Get_Data_Panel['type'] == "marzban" || $Get_Data_Panel['type'] == "rebecca") {
             //create user
             $ConnectToPanel = adduser($Get_Data_Panel['name_panel'], $data_limit, $usernameC, $expire, $note, $Get_Data_Product['data_limit_reset'], $Get_Data_Product['name_product']);
             if (!empty($ConnectToPanel['status']) && $ConnectToPanel['status'] == 500) {
@@ -425,7 +425,7 @@ class ManagePanel
         } else {
             $invoice = false;
         }
-        if ($Get_Data_Panel['type'] == "marzban") {
+        if ($Get_Data_Panel['type'] == "marzban" || $Get_Data_Panel['type'] == "rebecca") {
             $UsernameData = getuser($username, $Get_Data_Panel['name_panel']);
             if (!empty($UsernameData['error'])) {
                 $Output = array(
@@ -990,7 +990,7 @@ class ManagePanel
     {
         $Output = array();
         $Get_Data_Panel = select("marzban_panel", "*", "name_panel", $name_panel, "select");
-        if ($Get_Data_Panel['type'] == "marzban") {
+        if ($Get_Data_Panel['type'] == "marzban" || $Get_Data_Panel['type'] == "rebecca") {
             $revoke_sub = revoke_sub($username, $name_panel);
             if (isset($revoke_sub['detail']) && $revoke_sub['detail']) {
                 $Output = array(
@@ -1201,7 +1201,7 @@ class ManagePanel
     {
         $Output = array();
         $Get_Data_Panel = select("marzban_panel", "*", "name_panel", $name_panel, "select");
-        if ($Get_Data_Panel['type'] == "marzban") {
+        if ($Get_Data_Panel['type'] == "marzban" || $Get_Data_Panel['type'] == "rebecca") {
             $UsernameData = removeuser($Get_Data_Panel['name_panel'], $username);
             if (!empty($UsernameData['status']) && $UsernameData['status'] != 200) {
                 return array(
@@ -1380,7 +1380,7 @@ class ManagePanel
     {
         $Output = array();
         $Get_Data_Panel = select("marzban_panel", "*", "name_panel", $name_panel, "select");
-        if ($Get_Data_Panel['type'] == "marzban") {
+        if ($Get_Data_Panel['type'] == "marzban" || $Get_Data_Panel['type'] == "rebecca") {
             if ($Get_Data_Panel['version_panel'] == "1") {
                 $result = getuser($username, $name_panel);
                 $result = json_decode($result['body'], true);
@@ -1443,11 +1443,6 @@ class ManagePanel
                 "tgId" => 0,
                 "enable" => isset($config['enable']) ? $config['enable'] : true,
             );
-            if (!empty($config['id']))
-                $data['id'] = $config['id'];
-            if (!empty($config['subId']))
-                $data['subId'] = $config['subId'];
-
             $modify = updateClient($Get_Data_Panel, $username, $data);
             attach_service($Get_Data_Panel, $username, json_decode($Get_Data_Panel['inbounds']));
             if (!empty($modify['error'])) {
@@ -1661,7 +1656,7 @@ class ManagePanel
             );
             return;
         }
-        if ($Get_Data_Panel['type'] == "marzban") {
+        if ($Get_Data_Panel['type'] == "marzban" || $Get_Data_Panel['type'] == "rebecca") {
             if ($DataUserOut['status'] == "active") {
                 $status = "disabled";
             } else {
@@ -1747,7 +1742,7 @@ class ManagePanel
                 'msg' => 'data not found'
             );
         }
-        if ($panel['type'] == "marzban") {
+        if ($panel['type'] == "marzban" || $panel['type'] == "rebecca") {
             $reset = ResetUserDataUsage($username, $panel['name_panel']);
             if (!empty($reset['status']) && $reset['status'] != 200) {
                 return array(
@@ -1957,7 +1952,7 @@ class ManagePanel
             $data_limit_last = $data_limit_last < 0 ? 0 : $data_limit_last;
             $data_limit_new = $data_limit_new + $data_limit_last;
         }
-        if ($panel['type'] == "marzban") {
+        if ($panel['type'] == "marzban" || $panel['type'] == "rebecca") {
             $data = array(
                 'data_limit' => $data_limit_new,
                 'expire' => $time_new,
@@ -2123,7 +2118,7 @@ class ManagePanel
         }
         update("invoice", 'uuid', null, "username", $username_account);
         update("invoice", 'Status', "active", "username", $username_account);
-        if ($panel['type'] == "marzban") {
+        if ($panel['type'] == "marzban" || $panel['type'] == "rebecca") {
             $data = array(
                 'data_limit' => $new_limit,
                 'inbounds' => $inbounds,
@@ -2253,7 +2248,7 @@ class ManagePanel
         }
         update("invoice", 'uuid', null, "username", $username_account);
         update("invoice", 'Status', "active", "username", $username_account);
-        if ($panel['type'] == "marzban") {
+        if ($panel['type'] == "marzban" || $panel['type'] == "rebecca") {
             $data = array(
                 'expire' => $new_limit,
                 'inbounds' => $inbounds,
