@@ -1201,6 +1201,9 @@ $keyboardtimereset = json_encode([
 $keyboardtypepanel = json_encode([
     'inline_keyboard' => [
         [
+            ['text' => 'ربکا - Rebecca', 'callback_data' => "typepanel#rebecca"]
+        ],
+        [
             ['text' => $textbotlang['keyboard']['marzban'], 'callback_data' => "typepanel#marzban"],
             ['text' => $textbotlang['keyboard']['marzneshin'], 'callback_data' => "typepanel#marzneshin"]
         ],
