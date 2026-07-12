@@ -41,6 +41,30 @@ if (in_array($text, $textadmin) || $datain == "admin") {
     sendmessage($from_id, $text_admin, $keyboardadmin, 'HTML');
     step('home', $from_id);
     return;
+} elseif (strpos($datain, "rebhost_edit_") !== false) {
+    if (!in_array($from_id, $admin_ids)) return;
+    $host_id = str_replace("rebhost_edit_", "", $datain);
+    $typepanel = select("marzban_panel", "*", "name_panel", $user['Processing_value'], "select");
+    update("marzban_panel", "inboundid", $host_id, "name_panel", $typepanel['name_panel']);
+    deletemessage($from_id, $message_id);
+    outtypepanel($typepanel['type'], "سرویس پیش‌فرض با موفقیت تنظیم شد.");
+    step('home', $from_id);
+} elseif ($user['step'] == "rebecca_edit_host") {
+    if (!is_numeric($text)) {
+        sendmessage($from_id, "❌ لطفاً فقط شناسه (ID) عددی سرویس را ارسال کنید:", null, 'HTML');
+        return;
+    }
+    $typepanel = select("marzban_panel", "*", "name_panel", $user['Processing_value'], "select");
+    update("marzban_panel", "inboundid", $text, "name_panel", $typepanel['name_panel']);
+    outtypepanel($typepanel['type'], "سرویس پیش‌فرض با موفقیت تنظیم شد.");
+    step('home', $from_id);
+} elseif (strpos($datain, "rebhost_") !== false) {
+    if (!in_array($from_id, $admin_ids)) return;
+    $host_id = str_replace("rebhost_", "", $datain);
+    savedata("save", "inboundid", $host_id);
+    deletemessage($from_id, $message_id);
+    sendmessage($from_id, $textbotlang['Admin']['managepanel']['getLimitedPanel'], $backadmin, 'HTML');
+    step('getlimitedpanel', $from_id);
 } elseif ($datain == "hide_mini_app_instruction") {
     if (!in_array($from_id, $admin_ids))
         return;
@@ -689,9 +713,72 @@ if (in_array($text, $textadmin) || $datain == "admin") {
     step('add_password_panel', $from_id);
     savedata("save", "username", $text);
 } elseif ($user['step'] == "add_password_panel") {
+    $userdata = json_decode($user['Processing_value'], true);
+    if ($userdata['type'] == "rebecca") {
+        // Temporarily save panel data to call API
+        $temp_code_panel = "temp_" . time();
+        $stmt = $pdo->prepare("INSERT INTO marzban_panel (code_panel, name_panel, url_panel, username_panel, password_panel, type, version_panel, on_hold_test) VALUES (:code, :name, :url, :user, :pass, :type, '0', '1')");
+        $stmt->execute([':code' => $temp_code_panel, ':name' => 'temp_rebecca', ':url' => $userdata['url_panel'], ':user' => $userdata['username'], ':pass' => $text, ':type' => 'rebecca']);
+        
+        $req = new CurlRequest($userdata['url_panel'] . '/api/v2/services?limit=100');
+        $req->setHeaders(['accept: application/json']);
+        $token_data = token_panel($temp_code_panel, false);
+        if(!empty($token_data['access_token'])) {
+            $req->setBearerToken($token_data['access_token']);
+        }
+        $services_response = $req->get();
+        
+        $stmt = $pdo->prepare("DELETE FROM marzban_panel WHERE code_panel = :code");
+        $stmt->execute([':code' => $temp_code_panel]);
+        
+        if (!empty($services_response['body'])) {
+            $services_data = json_decode($services_response['body'], true);
+            if (isset($services_data['services']) && is_array($services_data['services'])) {
+                $keyboard = ['inline_keyboard' => []];
+                $service_count = 0;
+                foreach ($services_data['services'] as $service) {
+                    if ($service_count >= 24) {
+                        $keyboard['inline_keyboard'][] = [['text' => '...', 'callback_data' => "ignore"]];
+                        break;
+                    }
+                    $keyboard['inline_keyboard'][] = [['text' => $service['name'], 'callback_data' => "rebhost_" . $service['id']]];
+                    $service_count++;
+                }
+            } else {
+                $services_data = [];
+            }
+        }
+        
+        if (isset($keyboard) && !empty($keyboard['inline_keyboard'])) {
+            sendmessage($from_id, "لطفاً سرویس (Service) پیش‌فرض برای ساخت کاربر را از دکمه‌های زیر انتخاب کنید و یا <b>آیدی عددی</b> سرویس را به صورت متنی ارسال نمایید:", json_encode($keyboard), 'HTML');
+            step('rebecca_get_host', $from_id);
+            savedata("save", "password", $text);
+            return;
+        } else {
+            if (isset($services_response['error']) && strpos($services_response['error'], 'Could not resolve host') !== false) {
+                sendmessage($from_id, $textbotlang['Admin']['managepanel']['invalidDomain'], $backadmin, 'HTML');
+            } elseif (isset($services_response['status']) && $services_response['status'] == 401) {
+                sendmessage($from_id, $textbotlang['Admin']['adminphp']['err_invalid_panel_user'] ?? '❌ نام کاربری یا رمز عبور اشتباه است.', $backadmin, 'HTML');
+            } else {
+                $error_details = json_encode($services_response, JSON_UNESCAPED_UNICODE);
+                sendmessage($from_id, "خطا در دریافت لیست سرویس‌ها از پنل ربکا.
+پاسخ سرور: <code>$error_details</code>", $backadmin, 'HTML');
+            }
+            return;
+        }
+    }
+    
     sendmessage($from_id, $textbotlang['Admin']['managepanel']['getLimitedPanel'], $backadmin, 'HTML');
     step('getlimitedpanel', $from_id);
     savedata("save", "password", $text);
+} elseif ($user['step'] == "rebecca_get_host") {
+    if (!is_numeric($text)) {
+        sendmessage($from_id, "❌ لطفاً فقط شناسه (ID) عددی سرویس را ارسال کنید:", null, 'HTML');
+        return;
+    }
+    savedata("save", "inboundid", $text);
+    sendmessage($from_id, $textbotlang['Admin']['managepanel']['getLimitedPanel'], $backadmin, 'HTML');
+    step('getlimitedpanel', $from_id);
 } elseif ($user['step'] == "getlimitedpanel") {
     savedata("save", "limitpanel", $text);
     $userdata = json_decode($user['Processing_value'], true);
@@ -721,7 +808,7 @@ if (in_array($text, $textadmin) || $datain == "admin") {
     $namecustoms = "none";
     $type = "marzban";
     $conecton = "offconecton";
-    $inboundid = 1;
+    $inboundid = isset($userdata['inboundid']) ? $userdata['inboundid'] : 1;
     $agent = "all";
     $time = "1";
     $valume = "100";
@@ -2607,7 +2694,7 @@ elseif ($datain == "systemsms") {
     savedata("save", "price_product", $text);
     $userdata = json_decode($user['Processing_value'], true);
     $panel = select("marzban_panel", "*", "name_panel", $userdata['Location'], "select");
-    if ($panel['type'] == "marzban" || $panel['type'] == "marzneshin") {
+    if ($panel['type'] == "marzban" || $panel['type'] == "rebecca" || $panel['type'] == "marzneshin") {
         sendmessage($from_id, $textbotlang['Admin']['Product']['getTimeReset'], $keyboardtimereset, 'HTML');
         step('getnote', $from_id);
         return;
@@ -3486,7 +3573,7 @@ elseif ($datain == "systemsms") {
     step('GetLocationEdit', $from_id);
 } elseif ($user['step'] == "GetLocationEdit") {
     $marzban_list_get = select("marzban_panel", "*", "name_panel", $text, "select");
-    if ($marzban_list_get['type'] == "marzban") {
+    if ($marzban_list_get['type'] == "marzban" || $marzban_list_get['type'] == "rebecca") {
         $Check_token = token_panel($marzban_list_get['code_panel'], false);
         if (isset($Check_token['access_token'])) {
             $System_Stats = Get_System_Stats($text);
@@ -3518,16 +3605,19 @@ elseif ($datain == "systemsms") {
 
             $Condition_marzban = "";
             $text_marzban = sprintf($textbotlang['Admin']['adminphp']['ok_select_panel_user_1'], $total_user, $active_users, $System_Stats['version'], $mem_total, $mem_used, $bandwidth, $ListSell, $ListSellSUM, $marzban_list_get['agent']);
+            if ($marzban_list_get['type'] == "rebecca") {
+                $text_marzban = str_replace("مرزبان", "ربکا", $text_marzban);
+            }
             if ($marzban_list_get['version_panel'] == "1") {
                 $text_marzban = str_replace($textbotlang['keyboard']['marzban'], $textbotlang['keyboard']['passargadPanel'], $text_marzban);
             }
-            sendmessage($from_id, $text_marzban, $optionMarzban, 'HTML');
+            outtypepanel($marzban_list_get['type'], $text_marzban);
         } elseif (isset($Check_token['detail']) && $Check_token['detail'] == "Incorrect username or password") {
             $text_marzban = $textbotlang['Admin']['adminphp']['err_invalid_panel_user'];
-            sendmessage($from_id, $text_marzban, $optionMarzban, 'HTML');
+            outtypepanel($marzban_list_get['type'], $text_marzban);
         } else {
             $text_marzban = $textbotlang['Admin']['managepanel']['errorStatusPanel'] . json_encode($Check_token);
-            sendmessage($from_id, $text_marzban, $optionMarzban, 'HTML');
+            outtypepanel($marzban_list_get['type'], $text_marzban);
         }
     } elseif ($marzban_list_get['type'] == "x-ui_single") {
         $status_server = status_server_xui($marzban_list_get);
@@ -3620,11 +3710,11 @@ elseif ($datain == "systemsms") {
             $System_Stats = Get_System_Statsm($text);
             if (!empty($System_Stats['status']) && $System_Stats['status'] != 200) {
                 $text_marzban = $textbotlang['Admin']['adminphp']['err_error_1'] . $System_Stats['status'];
-                sendmessage($from_id, $text_marzban, $optionMarzban, 'HTML');
+                outtypepanel($marzban_list_get['type'], $text_marzban);
                 return;
             } elseif (!empty($System_Stats['error'])) {
                 $text_marzban = $textbotlang['Admin']['adminphp']['err_error_2'] . $System_Stats['error'];
-                sendmessage($from_id, $text_marzban, $optionMarzban, 'HTML');
+                outtypepanel($marzban_list_get['type'], $text_marzban);
                 return;
             }
             $System_Stats = json_decode($System_Stats['body'], true);
@@ -3645,10 +3735,10 @@ elseif ($datain == "systemsms") {
             sendmessage($from_id, $text_marzban, $optionmarzneshin, 'HTML');
         } elseif (isset($Check_token['detail']) && $Check_token['detail'] == "Incorrect username or password") {
             $text_marzban = $textbotlang['Admin']['adminphp']['err_invalid_panel_user'];
-            sendmessage($from_id, $text_marzban, $optionMarzban, 'HTML');
+            outtypepanel($marzban_list_get['type'], $text_marzban);
         } else {
             $text_marzban = $textbotlang['Admin']['managepanel']['errorStatusPanel'] . json_encode($Check_token);
-            sendmessage($from_id, $text_marzban, $optionMarzban, 'HTML');
+            outtypepanel($marzban_list_get['type'], $text_marzban);
         }
     } elseif ($marzban_list_get['type'] == "WGDashboard") {
         sendmessage($from_id, $textbotlang['users']['selectoption'], $optionwg, 'HTML');
@@ -4948,7 +5038,8 @@ elseif ($datain == "systemsms") {
         sendmessage($from_id, $textbotlang['Admin']['managepanel']['Inbound']['endInbound'], $optionmarzneshin, 'HTML');
         return;
     }
-    sendmessage($from_id, $textbotlang['Admin']['managepanel']['Inbound']['endInbound'], $optionMarzban, 'HTML');
+    $typepanel = select("marzban_panel", "*", "name_panel", $user['Processing_value'], "select");
+    outtypepanel($typepanel['type'], $textbotlang['Admin']['managepanel']['Inbound']['endInbound']);
     step('home', $from_id);
     return;
 } elseif ($text == $textbotlang['keyboard']['setAffiliatePercent'] && $adminrulecheck['rule'] == "administrator") {
@@ -6640,7 +6731,7 @@ if ($datain == "settimecornremove" && $adminrulecheck['rule'] == "administrator"
 } elseif ($user['step'] == "getlocoption") {
     update("user", "Processing_value", $text, "id", $from_id);
     $typepanel = select("marzban_panel", "*", "name_panel", $text, "select")['type'];
-    if ($typepanel == "marzban") {
+    if ($typepanel == "marzban" || $typepanel == "rebecca") {
         sendmessage($from_id, $textbotlang['users']['selectoption'], $optionathmarzban, 'HTML');
     } elseif ($typepanel == "x-ui_single") {
         sendmessage($from_id, $textbotlang['users']['selectoption'], $optionathx_ui, 'HTML');
@@ -8425,7 +8516,51 @@ if ($datain == "settimecornremove" && $adminrulecheck['rule'] == "administrator"
         sendmessage($from_id, $textbotlang['Admin']['adminphp']['ok_success_set_2'], $setting_panel, 'HTML');
         step("home", $from_id);
     }
-} elseif ($text == $textbotlang['keyboard']['setProtocolInbound'] || $text == $textbotlang['Admin']['adminphp']['btn_set_group_name'] || $text == $textbotlang['Admin']['adminphp']['btn_set_2']) {
+} elseif ($text == $textbotlang['keyboard']['setProtocolInbound'] || $text == '⚙️ تنظیم سرویس پیش‌فرض' || $text == $textbotlang['Admin']['adminphp']['btn_set_group_name'] || $text == $textbotlang['Admin']['adminphp']['btn_set_2']) {
+    if ($text == '⚙️ تنظیم سرویس پیش‌فرض') {
+        $typepanel = select("marzban_panel", "*", "name_panel", $user['Processing_value'], "select");
+        $req = new CurlRequest($typepanel['url_panel'] . '/api/v2/services?limit=100');
+        $req->setHeaders(['accept: application/json']);
+        $token_data = token_panel($typepanel['code_panel'], false);
+        if(!empty($token_data['access_token'])) {
+            $req->setBearerToken($token_data['access_token']);
+        }
+        $services_response = $req->get();
+        if (!empty($services_response['body'])) {
+            $services_data = json_decode($services_response['body'], true);
+            if (isset($services_data['services']) && is_array($services_data['services'])) {
+                $keyboard = ['inline_keyboard' => []];
+                $service_count = 0;
+                foreach ($services_data['services'] as $service) {
+                    if ($service_count >= 24) {
+                        $keyboard['inline_keyboard'][] = [['text' => '...', 'callback_data' => "ignore"]];
+                        break;
+                    }
+                    $keyboard['inline_keyboard'][] = [['text' => $service['name'], 'callback_data' => "rebhost_edit_" . $service['id']]];
+                    $service_count++;
+                }
+            } else {
+                $services_data = [];
+            }
+        }
+        if (isset($keyboard) && !empty($keyboard['inline_keyboard'])) {
+            sendmessage($from_id, "لطفاً سرویس (Service) پیش‌فرض برای ساخت کاربر را از دکمه‌های زیر انتخاب کنید و یا <b>آیدی عددی</b> سرویس را به صورت متنی ارسال نمایید:", json_encode($keyboard), 'HTML');
+            step('rebecca_edit_host', $from_id);
+            return;
+        } else {
+            if (isset($services_response['error']) && strpos($services_response['error'], 'Could not resolve host') !== false) {
+                sendmessage($from_id, $textbotlang['Admin']['managepanel']['invalidDomain'], $backadmin, 'HTML');
+            } elseif (isset($services_response['status']) && $services_response['status'] == 401) {
+                sendmessage($from_id, $textbotlang['Admin']['adminphp']['err_invalid_panel_user'] ?? '❌ نام کاربری یا رمز عبور اشتباه است.', $backadmin, 'HTML');
+            } else {
+                $error_details = json_encode($services_response, JSON_UNESCAPED_UNICODE);
+                sendmessage($from_id, "خطا در دریافت لیست سرویس‌ها از پنل ربکا.
+پاسخ سرور: <code>$error_details</code>", $backadmin, 'HTML');
+            }
+            return;
+        }
+    }
+    
     if ($text == $textbotlang['Admin']['adminphp']['btn_set_group_name']) {
         $textsetprotocol = $textbotlang['Admin']['adminphp']['ask_send_group_name'];
     } elseif ($text == $textbotlang['Admin']['adminphp']['btn_set_2']) {
@@ -8437,7 +8572,7 @@ if ($datain == "settimecornremove" && $adminrulecheck['rule'] == "administrator"
     step("setinboundandprotocol", $from_id);
 } elseif ($user['step'] == "setinboundandprotocol") {
     $panel = select("marzban_panel", "*", "name_panel", $user['Processing_value'], "select");
-    if ($panel['type'] == "marzban") {
+    if ($panel['type'] == "marzban" || $panel['type'] == "rebecca") {
         if ($panel['version_panel'] == "1") {
             $DataUserOut = getuser($text, $user['Processing_value']);
             if (!empty($DataUserOut['error'])) {
@@ -8782,7 +8917,7 @@ elseif ($text == $textbotlang['keyboard']['hidePanelForUser'] && $adminrulecheck
 } elseif ($user['step'] == "getdatainboundproduct") {
     $marzban_list_get = select("marzban_panel", "*", "code_panel", $user['Processing_value_one']);
     $datainbound = "";
-    if ($marzban_list_get['type'] == "marzban") {
+    if ($marzban_list_get['type'] == "marzban" || $marzban_list_get['type'] == "rebecca") {
         $DataUserOut = getuser($text, $marzban_list_get['name_panel']);
         if (!empty($DataUserOut['error'])) {
             sendmessage($from_id, $DataUserOut['error'], null, 'HTML');
@@ -9603,7 +9738,7 @@ if ($datain == "settimecornday" && $adminrulecheck['rule'] == "administrator") {
             ['text' => $textbotlang['keyboard']['sendSubLink'], 'callback_data' => "none"],
         ];
     }
-    if (in_array($panel['type'], ['marzban', "x-ui_single", "marzneshin"])) {
+    if (in_array($panel['type'], ['marzban', "x-ui_single", "marzneshin", 'rebecca'])) {
         $Bot_Status['inline_keyboard'][] = [
             ['text' => $statusconnecton, 'callback_data' => "editpanel-connecton-{$panel['conecton']}-{$panel['code_panel']}"],
             ['text' => $textbotlang['keyboard']['firstConnection'], 'callback_data' => "none"],
@@ -9623,7 +9758,7 @@ if ($datain == "settimecornday" && $adminrulecheck['rule'] == "administrator") {
             ['text' => $textbotlang['keyboard']['exclusiveSubLink'], 'callback_data' => "none"],
         ];
     }
-    if (in_array($panel['type'], ["marzban"])) {
+    if (in_array($panel['type'], ["marzban", 'rebecca'])) {
         $Bot_Status['inline_keyboard'][] = [
             ['text' => $inbocunddisable, 'callback_data' => "editpanel-inbocunddisable-{$panel['inboundstatus']}-{$panel['code_panel']}"],
             ['text' => $textbotlang['keyboard']['inactiveAccount'], 'callback_data' => "none"],
@@ -9841,7 +9976,7 @@ if ($datain == "settimecornday" && $adminrulecheck['rule'] == "administrator") {
             ['text' => $textbotlang['keyboard']['sendSubLink'], 'callback_data' => "none"],
         ];
     }
-    if (in_array($panel['type'], ['marzban', "x-ui_single", "marzneshin"])) {
+    if (in_array($panel['type'], ['marzban', "x-ui_single", "marzneshin", 'rebecca'])) {
         $Bot_Status['inline_keyboard'][] = [
             ['text' => $statusconnecton, 'callback_data' => "editpanel-connecton-{$panel['conecton']}-{$panel['code_panel']}"],
             ['text' => $textbotlang['keyboard']['firstConnection'], 'callback_data' => "none"],
@@ -9861,7 +9996,7 @@ if ($datain == "settimecornday" && $adminrulecheck['rule'] == "administrator") {
             ['text' => $textbotlang['keyboard']['exclusiveSubLink'], 'callback_data' => "none"],
         ];
     }
-    if (in_array($panel['type'], ["marzban"])) {
+    if (in_array($panel['type'], ["marzban", 'rebecca'])) {
         $Bot_Status['inline_keyboard'][] = [
             ['text' => $inbocunddisable, 'callback_data' => "editpanel-inbocunddisable-{$panel['inboundstatus']}-{$panel['code_panel']}"],
             ['text' => $textbotlang['keyboard']['inactiveAccount'], 'callback_data' => "none"],
